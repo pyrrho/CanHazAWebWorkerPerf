@@ -2,23 +2,6 @@
 
 <head>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css" />
-    <style>
-        * {margin:0;padding:0;}
-        #px {
-            font-family: "Courier new", monospace;
-            min-width:100px;
-            display: inline-block;
-            text-align: right;
-        }
-        #square {
-            width: 200px;
-            height: 200px;
-            border: 1px dashed red;
-            display:table-cell;
-            text-align: center;
-            vertical-align: middle;
-        }
-    </style>
 
     <script id="worker" type="application/javascript_worker">
         const TRANSFORM = [
@@ -34,24 +17,38 @@
             ret[1] = (v[0] * TRANSFORM[1][0]) + (v[1] * TRANSFORM[1][1]) + (v[2] * TRANSFORM[1][2]) + (v[3] * TRANSFORM[1][3])
             ret[2] = (v[0] * TRANSFORM[2][0]) + (v[1] * TRANSFORM[2][1]) + (v[2] * TRANSFORM[2][2]) + (v[3] * TRANSFORM[2][3])
             ret[3] = (v[0] * TRANSFORM[3][0]) + (v[1] * TRANSFORM[3][1]) + (v[2] * TRANSFORM[3][2]) + (v[3] * TRANSFORM[3][3])
-            return ret
+
+            v.set(ret)
         }
 
-        self.onmessage = function (msg) {
-            const data = msg.data
-
-            switch (data.type) {
-                case ('hello'):
-                    this.postMessage(data)
-                    break
+        self.onmessage = function (m) {
+            switch (m.data.type) {
                 case ('transform'):
-                    this.postMessage(
+                    m.data.buffers.forEach(e => {
+                        let a = new Float64Array(e)
+                        transform(a)
+                    })
+                    self.postMessage(
                         {
                             type: 'transformed',
-                            start: data.start,
-                            end: data.end,
-                            vects: data.vects.map(transform)
-                        })
+                            start: m.data.start,
+                            end: m.data.end,
+                            buffers: m.data.buffers,
+                        },
+                        m.data.buffers,
+                    )
+                    break
+                case ('transform_one'):
+                    let a = new Float64Array(m.data.buffer)
+                    transform(a)
+                    self.postMessage(
+                        {
+                            type: 'transformed_one',
+                            index: m.data.index,
+                            buffer: m.data.buffer,
+                        },
+                        [m.data.buffer],
+                    )
                     break
             }
         }
@@ -66,7 +63,13 @@
                     Vector Count:
                 </td>
                 <td>
-                    <input type="text" id="vecCount" name="vecCount" value="1000000" /><br />
+                    <input type="text" id="vectCount" value="1000000" /><br />
+                </td>
+                <td>
+                    Vectors Sent:
+                </td>
+                <td id="vectTx">
+                    0
                 </td>
             </tr>
             <tr>
@@ -74,7 +77,13 @@
                     Batch Size:
                 </td>
                 <td>
-                    <input type="text" id="batchSize" name="batchSize" value="10000" /><br />
+                    <input type="text" id="batchSize" value="1" /><br />
+                </td>
+                <td>
+                    Vectors Received:
+                </td>
+                <td id="vectRx">
+                    0
                 </td>
             </tr>
             <tr>
@@ -82,7 +91,10 @@
                     Worker Count:
                 </td>
                 <td>
-                    <input type="text" id="workerCount" name="workerCount" value="2" /><br />
+                    <input type="text" id="workerCount" value="8" /><br />
+                </td>
+                <td id="state" style="width: 18.5rem;">
+                    Hit 'Run' when you're ready
                 </td>
             </tr>
         </tbody>
@@ -90,7 +102,7 @@
     <div>
         <button id="run" style="width: 4rem; margin-left: 3rem;">Run</button>
     </div>
-    <textarea id="runs" rows="45" cols="80" style="margin-left: 1rem;"></textarea>
+    <textarea id="runs" rows="40" cols="80" style="margin: 1rem 1rem;"></textarea>
 
     <script type="application/javascript" src="./main.js"></script>
 </body>
