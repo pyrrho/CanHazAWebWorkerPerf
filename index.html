@@ -42,7 +42,6 @@
 
             switch (data.type) {
                 case ('hello'):
-                    console.log(`Worker: Main wants to say hello! '${data.msg}'`)
                     this.postMessage(data)
                     break
                 case ('transform'):

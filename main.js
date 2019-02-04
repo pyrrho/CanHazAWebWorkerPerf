@@ -38,29 +38,29 @@ document
             ])
         }
 
+        if (g_workerCount == 0) {
+            g_vects.map(transform)
+            markReplaced(g_vecCount)
+        }
+
         for (let i = 0; i < g_workerCount; i++) {
             g_workers.push(new Worker(workerBlobURL))
             g_workers[i].onmessage = WorkerOnMessage
+            g_workers[i].postMessage({ type: 'hello', msg: "making sure you're warm" })
         }
 
         g_startTime = performance.now()
 
-        if (g_workerCount == 0) {
-            g_vects.map(transform)
-            markReplaced(g_vecCount)
-        } else {
-            for (let i = 0, j = 0; i < g_vects.length; i += g_batchSize) {
-                const start = i
-                const end = i + g_batchSize
-                if (j == g_workerCount) { j = 0 }
-                g_workers[j].postMessage({
-                    type: 'transform',
-                    start: start,
-                    end: end,
-                    vects: g_vects.slice(start, end)
-                })
-            }
-
+        for (let i = 0, j = 0; i < g_vects.length; i += g_batchSize) {
+            const start = i
+            const end = i + g_batchSize
+            if (j == g_workerCount) { j = 0 }
+            g_workers[j].postMessage({
+                type: 'transform',
+                start: start,
+                end: end,
+                vects: g_vects.slice(start, end)
+            })
         }
     })
 
@@ -72,6 +72,8 @@ function WorkerOnMessage(msg) {
                 g_vects[i + data.start] = data.vects[i]
             }
             markReplaced(data.end - data.start)
+            break;
+        case 'hello':
             break;
         default:
             alert(`Received a message I don't know what to do with: ${JSON.stringify(msg)}`)
