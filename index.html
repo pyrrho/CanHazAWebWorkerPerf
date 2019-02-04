@@ -37,9 +37,6 @@
             return ret
         }
 
-
-        console.log('Worker: Ready for action!');
-
         self.onmessage = function (msg) {
             const data = msg.data
 
@@ -63,15 +60,38 @@
 </head>
 
 <body>
+    <table>
+        <tbody>
+            <tr>
+                <td>
+                    Vector Count:
+                </td>
+                <td>
+                    <input type="text" id="vecCount" name="vecCount" value="1000000" /><br />
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Batch Size:
+                </td>
+                <td>
+                    <input type="text" id="batchSize" name="batchSize" value="10000" /><br />
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Worker Count:
+                </td>
+                <td>
+                    <input type="text" id="workerCount" name="workerCount" value="2" /><br />
+                </td>
+            </tr>
+        </tbody>
+    </table>
     <div>
-        <label for="vecCount">Vector Count: </label>
-        <input type="text" id="vecCount" name="vecCount" value="10000"><br />
-        <label for="batchSize">Batch Size: </label>
-        <input type="text" id="batchSize" name="batchSize" value="100"><br />
-        <button id="run" style="width: 4rem; margin-left: 1rem;">Run</button>
-        <hr style="margin: 1rem 0;">
-        <textarea id="runs" rows="45" cols="80"></textarea>
+        <button id="run" style="width: 4rem; margin-left: 3rem;">Run</button>
     </div>
+    <textarea id="runs" rows="45" cols="80" style="margin-left: 1rem;"></textarea>
 
     <script type="application/javascript" src="./main.js"></script>
 </body>

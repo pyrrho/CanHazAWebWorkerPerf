@@ -2,11 +2,15 @@
 
 const g_runsElement = document.getElementById("runs")
 
-let g_vects = []
-let g_replaced = 0
 let g_vecCount = 0
 let g_batchSize = 0
+let g_workerCount = 0
+
+let g_vects = []
+let g_workers = []
+
 let g_startTime = 0
+let g_replaced = 0
 
 
 // Fetch the worker tag's text, turn that into a blob, generate the URL of that
@@ -16,8 +20,51 @@ const workerText = workerScript.innerText
 const workerBlob = new Blob([workerText], { type: 'application/json' })
 const workerBlobURL = URL.createObjectURL(workerBlob)
 
-const g_worker = new Worker(workerBlobURL)
-g_worker.onmessage = msg => {
+document
+    .getElementById('run')
+    .addEventListener('click', () => {
+        g_replaced = 0
+        g_vects = []
+        g_vecCount = parseInt(document.getElementById('vecCount').value, 10)
+        g_batchSize = parseInt(document.getElementById('batchSize').value, 10)
+        g_workerCount = parseInt(document.getElementById('workerCount').value, 10)
+
+        for (let i = 0; i < g_vecCount; i++) {
+            g_vects.push([
+                randBetween(0, 1000),
+                randBetween(0, 1000),
+                randBetween(0, 1000),
+                1,
+            ])
+        }
+
+        for (let i = 0; i < g_workerCount; i++) {
+            g_workers.push(new Worker(workerBlobURL))
+            g_workers[i].onmessage = WorkerOnMessage
+        }
+
+        g_startTime = performance.now()
+
+        if (g_workerCount == 0) {
+            g_vects.map(transform)
+            markReplaced(g_vecCount)
+        } else {
+            for (let i = 0, j = 0; i < g_vects.length; i += g_batchSize) {
+                const start = i
+                const end = i + g_batchSize
+                if (j == g_workerCount) { j = 0 }
+                g_workers[j].postMessage({
+                    type: 'transform',
+                    start: start,
+                    end: end,
+                    vects: g_vects.slice(start, end)
+                })
+            }
+
+        }
+    })
+
+function WorkerOnMessage(msg) {
     const data = msg.data
     switch (data.type) {
         case 'transformed':
@@ -32,40 +79,6 @@ g_worker.onmessage = msg => {
     }
 }
 
-document
-    .getElementById('run')
-    .addEventListener('click', () => {
-        g_replaced = 0
-        g_vects = []
-        g_vecCount = parseInt(document.getElementById('vecCount').value, 10)
-        g_batchSize = parseInt(document.getElementById('batchSize').value, 10)
-
-        Array.from(Array(g_vecCount).keys()).forEach(_ => {
-            g_vects.push([randBetween(0, 1000), randBetween(0, 1000), randBetween(0, 1000), 1])
-        })
-
-        g_startTime = performance.now()
-
-        if (g_batchSize == 0) {
-            g_vects.map(transform)
-            markReplaced(g_vecCount)
-        } else {
-            for (var i = 0; i < g_vects.length; i += g_batchSize) {
-                const start = i
-                const end = i + g_batchSize
-                g_worker.postMessage({
-                    type: 'transform',
-                    start: start,
-                    end: end,
-                    vects: g_vects.slice(start, end)
-                })
-            }
-
-        }
-
-
-    })
-
 function markReplaced(count) {
     g_replaced += count
 
@@ -73,6 +86,12 @@ function markReplaced(count) {
         alert(`Off By One error somewhere!(${g_vecCount}, ${replaced})`)
     } else if (g_replaced == g_vecCount) {
         let duration = performance.now() - g_startTime
+
+        for (let i = 0; i < g_workerCount; i++) {
+            g_workers[i].terminate()
+        }
+        g_workers = []
+
         g_runsElement.value +=
             `${g_vecCount} vectors batched into chunks of ${g_batchSize} each\n` +
             `\t\t${duration}ms\n`
