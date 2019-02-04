@@ -67,7 +67,7 @@ function markReplaced(count) {
     } else if (g_replaced == g_vecCount) {
         let duration = performance.now() - g_startTime
         g_runsElement.value +=
-            `${g_vecCount} vectors batched into ${g_batchSize} chunks took\n` +
+            `${g_vecCount} vectors batched into chunks of ${g_batchSize} each\n` +
             `\t\t${duration}ms\n`
     }
 }
