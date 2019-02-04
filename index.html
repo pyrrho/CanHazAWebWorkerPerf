@@ -1,0 +1,39 @@
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css" />
+    <style>
+        * {margin:0;padding:0;}
+        #px {
+            font-family: "Courier new", monospace;
+            min-width:100px;
+            display: inline-block;
+            text-align: right;
+        }
+        #square {
+            width: 200px;
+            height: 200px;
+            border: 1px dashed red;
+            display:table-cell;
+            text-align: center;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <label for="vecCount">Vector Count: </label>
+        <input type="text" id="vecCount" name="vecCount" value="10000"><br />
+        <label for="batchSize">Batch Size: </label>
+        <input type="text" id="batchSize" name="batchSize" value="100"><br />
+        <button id="run" style="width: 4rem; margin-left: 1rem;">Run</button>
+        <hr style="margin: 1rem 0;">
+        <textarea id="runs" rows="45" cols="80"></textarea>
+    </div>
+
+    <link rel="import" href="./worker.js" id="worker" />
+    <script type="application/javascript" src="./main.js"></script>
+</body>
+
+</html>
