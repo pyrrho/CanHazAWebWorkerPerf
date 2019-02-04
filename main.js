@@ -11,8 +11,8 @@ let g_startTime = 0
 
 // Fetch the worker tag's text, turn that into a blob, generate the URL of that
 // blob, then use that blob to generate a web-worker.
-const workerLink = document.getElementById("worker")
-const workerText = workerLink.import.body.innerText
+const workerScript = document.getElementById("worker")
+const workerText = workerScript.innerText
 const workerBlob = new Blob([workerText], { type: 'application/json' })
 const workerBlobURL = URL.createObjectURL(workerBlob)
 
