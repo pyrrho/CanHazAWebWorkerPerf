@@ -85,12 +85,23 @@ function Initialize() {
         g_workers[i].postMessage({ type: 'hello', msg: "making sure you're warm" })
     }
 
-    // If we're not batching (the batch size is 1) try to optimize posting
+    // If we're not batching (the batch size is 1) try to optimize how we post
+    // TODO: We don't. This isn't optimized at all.
     if (g_batchSize === 1) {
         g_stateElement.innerHTML = `Transmitting individual buffers...`
         g_vectTxElement.innerHTML = '...'
 
         setTimeout(transmitForEach)
+        return
+    }
+    // If we're sending the whole batch over in one go (batch size === vect
+    // count) try to optize that.
+    // TODO: It's not. It's not optimized. It's so slow...
+    if (g_batchSize == g_vectCount) {
+        g_stateElement.innerHTML = `Transmitting as one buffer...`
+        g_vectTxElement.innerHTML = '...'
+
+        setTimeout(transmitAll)
         return
     }
 
@@ -128,6 +139,23 @@ function transmitForEach() {
             [e],
         )
     })
+    g_vectTxElement.innerHTML = g_vectCount
+}
+
+function transmitAll() {
+    g_startTime = performance.now()
+
+    console.log('hi')
+    g_workers[0].postMessage(
+        {
+            type: 'transform',
+            buffers: g_buffers,
+            start: 0,
+            end: g_vectCount,
+        },
+        g_buffers,
+    )
+    console.log('bye')
     g_vectTxElement.innerHTML = g_vectCount
 }
 
@@ -185,8 +213,8 @@ function markReplaced(count) {
         let duration = performance.now() - g_startTime
 
         g_runsElement.value += (
-            `vect count: ${g_vectCount} -- batch size: ${g_batchSize} -- worker count: ${g_workerCount}\n` +
-            `\t\t${duration}ms\n`
+            `vector count: ${g_vectCount} -- batch size: ${g_batchSize} -- worker count: ${g_workerCount}\n` +
+            `\t${duration}ms\n`
         )
         g_stateElement.innerHTML = "Finished"
 
