@@ -28,6 +28,13 @@
 
         self.onmessage = function (m) {
             switch (m.data.type) {
+                case ('ping'):
+                    self.postMessage(
+                        {
+                            type: 'pong',
+                        },
+                    )
+                    break
                 case ('transform'):
                     m.data.buffers.forEach(e => {
                         let a = new Float64Array(e)
