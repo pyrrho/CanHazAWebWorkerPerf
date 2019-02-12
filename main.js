@@ -32,13 +32,6 @@ function g_reset() {
 }
 
 
-// Fetch the worker tag's text, turn that into a blob, generate the URL of that
-// blob, then use that blob to generate a web-worker.
-const workerScript = document.getElementById("worker")
-const workerText = workerScript.innerText
-const workerBlob = new Blob([workerText], { type: 'application/json' })
-const workerBlobURL = URL.createObjectURL(workerBlob)
-
 document
     .getElementById('run')
     .addEventListener('click', () => {
@@ -80,7 +73,7 @@ function Initialize() {
     // If we're using workers, set them up
     g_workers = new Array(g_workerCount)
     for (let i = 0; i < g_workerCount; i++) {
-        g_workers[i] = new Worker(workerBlobURL)
+        g_workers[i] = new Worker('worker.js')
         g_workers[i].onmessage = workerOnMessage
         g_workers[i].postMessage({ type: 'hello', msg: "making sure you're warm" })
     }
