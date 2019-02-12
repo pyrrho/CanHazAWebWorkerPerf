@@ -1,51 +1,242 @@
 "use strict"
 
-const g_LOFAElements = {
-    vectTx: document.querySelector("#vectTx"),
-    vectRx: document.querySelector("#vectRx"),
-    state: document.querySelector("#state"),
-    runs: document.querySelector("#runs"),
-    vectCount: document.getElementById('vectCount'),
-    batchSize: document.getElementById('batchSize'),
-    workerCount: document.getElementById('workerCount'),
+// Global HTML elements
+const g_elements = {
+    state: document.querySelector('#state'),
+    tx: document.querySelector('#vectTx'),
+    rx: document.querySelector('#vectRx'),
+    vectCount: document.querySelector('#vectCount'),
+    batchSize: document.querySelector('#batchSize'),
+    workerCount: document.querySelector('#workerCount'),
+    output: document.querySelector('#output'),
 }
 
+// Global variables
+// WHAT A GREAT IDEA!!!1!
 let g_running = false
 
 let g_vectCount = 0
 let g_batchSize = 0
 let g_workerCount = 0
 
-let g_buffers = null
-let g_workers = []
-
 let g_startTime = 0
-let g_replaced = 0
+let g_endTime = 0
 
-function g_reset() {
-    for (let i = 0; i < g_workerCount; i++) {
-        g_workers[i].terminate()
-    }
-
+let g_reset = () => {
     g_vectCount = 0
     g_batchSize = 0
     g_workerCount = 0
 
-    g_buffers = null
-    g_workers = []
-
     g_startTime = 0
-    g_replaced = 0
-
-    g_running = false
+    g_endTime = 0
 }
+
+let readConfigs = () => {
+    g_vectCount = parseInt(g_elements.vectCount.value, 10)
+    g_batchSize = parseInt(g_elements.batchSize.value, 10)
+    g_workerCount = parseInt(g_elements.workerCount.value, 10)
+}
+
+let resetState = () => {
+    g_elements.state.innerHTML = `Initializing...`
+    g_elements.tx.innerHTML = 0
+    g_elements.rx.innerHTML = 0
+}
+
+// On Click event listeners
+document
+    .querySelector('#run_lol_inplace')
+    .addEventListener('click', () => {
+        if (g_running) { return }
+        console.log("Starting List of Lists In-Place")
+        resetState()
+        readConfigs()
+    })
+
+document
+    .querySelector('#run_lol_send')
+    .addEventListener('click', () => {
+        if (g_running) { return }
+        console.log("Starting List of Lists with Web Workers")
+        resetState()
+        readConfigs()
+    })
+
+document
+    .querySelector('#run_lofa_inplace')
+    .addEventListener('click', () => {
+        if (g_running) { return }
+        console.log("Starting List of FloatArray[4] In-Place")
+        resetState()
+        readConfigs()
+    })
+
+document
+    .querySelector('#run_lofa_send')
+    .addEventListener('click', () => {
+        if (g_running) { return }
+        console.log("Starting List of FloatArray[4] with Web Workers")
+        resetState()
+        readConfigs()
+        setTimeout(lofa.start)
+    })
+
+document
+    .querySelector('#run_lobatches_send')
+    .addEventListener('click', () => {
+        if (g_running) { return }
+        console.log("Starting List of Batched FloatArray[4*BatchSize]")
+        resetState()
+        readConfigs()
+    })
+
+document
+    .querySelector('#run_single_fa')
+    .addEventListener('click', () => {
+        if (g_running) { return }
+        console.log("Starting Single FloatArray[4*VectorCount]")
+        resetState()
+        readConfigs()
+    })
+
+
+
+// List Of Float64Arrays
+// ---------------------
+let lofa = (() => {
+    let lofa = {}
+
+    let l_workers = []
+    let l_buffersLen = 0
+    let l_sent = 0
+    let l_received = 0
+    let l_buffers = []
+
+    let l_reset = () => {
+        for (let i = 0, l = l_workers.length; i < l; i++) {
+            l_workers[i].terminate()
+        }
+
+        l_workers = []
+        l_sent = 0
+        l_received = 0
+        l_buffers = []
+    }
+
+    lofa.start = () => {
+        // TODO: Input validation
+        // assert 0 <  g_vectCount
+        // assert 0 <  g_batchSize <= g_vectCount
+        // assert 0 <  g_workerCount
+
+        // Dynamically build the array of 1x4 vectors
+        for (let i = 0; i < g_vectCount; i++) {
+            l_buffers.push(Float64Array.from([
+                randBetween(0, 1000),
+                randBetween(0, 1000),
+                randBetween(0, 1000),
+                1,
+            ]).buffer)
+        }
+        l_buffersLen = l_buffers.length
+
+        // Setup workers
+        for (let i = 0; i < g_workerCount; i++) {
+            l_workers.push(new Worker('worker.js'))
+            let last = l_workers.length - 1
+            l_workers[last].onmessage = lofaWorkerOnMessage
+            l_workers[last].postMessage({ type: 'ping' })
+        }
+        function lofaWorkerOnMessage(msg) {
+            switch (msg.data.type) {
+                case 'pong':
+                    //noop
+                    break
+                case 'transformed':
+                    for (let i = 0, l = msg.data.buffers.length; i < l; i++) {
+                        l_buffers[i + msg.data.start] = msg.data.buffers[i]
+                    }
+                    markReceived(msg.data.end - msg.data.start)
+                    break
+                default:
+                    console.error(`Received a message I don't know what to do with: ${JSON.stringify(msg.data)}`)
+                    break
+            }
+        }
+
+        // The general case;
+        g_elements.state.innerHTML = `Transmitting Batched buffers...`
+        g_startTime = performance.now()
+
+        setTimeout(transmitBatches, 0, 0, g_batchSize)
+    }
+
+    function transmitBatches(index, batchSize) {
+        for (
+            let j = 0, l = l_workers.length; j < l; j++) {
+            if (index === l_buffersLen) { return } // early out
+
+            const start = index
+            const end = index + g_batchSize
+            const buffers = l_buffers.slice(start, end)
+            const count = buffers.length
+
+            l_workers[j].postMessage(
+                {
+                    type: 'transform',
+                    buffers: buffers,
+                    start: start,
+                    end: end,
+                },
+                buffers,
+            )
+
+            index += count
+            markSent(count)
+        }
+
+        if (index !== l_buffersLen) {
+            setTimeout(transmitBatches, 0, index)
+        }
+    }
+
+    function markSent(count) {
+        l_sent += count
+        g_elements.tx.innerHTML = l_sent
+    }
+
+    function markReceived(count) {
+        l_received += count
+        g_elements.rx.innerHTML = l_received
+
+        if (l_received === l_buffersLen) {
+            let duration = performance.now() - g_startTime
+
+            g_elements.output.value += (
+                `number of Float64Arrays: ${l_buffersLen} (${humanReadableBytes(l_buffersLen * 4 * 64)}) ` +
+                `-- batch size: ${g_batchSize} (${humanReadableBytes(g_batchSize * 4 * 64)}) ` +
+                `-- worker count: ${g_workerCount}\n` +
+                `\t${duration.toFixed(2)}ms\n`
+            )
+            g_elements.state.innerHTML = 'Finished'
+
+            l_reset()
+            g_reset()
+        }
+    }
+
+    return lofa
+})()
+
+
+
 
 function humanReadableBytes(n) {
     const size_suffixes = [
-        "B",
-        "KB",
-        "MB",
-        "GB",
+        'B',
+        'KB',
+        'MB',
+        'GB',
     ]
     let s = 0
     while (n > 1000.0) {
@@ -55,195 +246,6 @@ function humanReadableBytes(n) {
 
     return `${n.toFixed(2)}${size_suffixes[s]}`
 
-}
-
-
-document
-    .getElementById('run')
-    .addEventListener('click', () => {
-        if (g_running) { return }
-        g_running = true
-
-        g_LOFAElements.state.innerHTML = `Initializing...`
-        g_LOFAElements.vectTx.innerHTML = 0
-        g_LOFAElements.vectRx.innerHTML = 0
-
-        g_vectCount = parseInt(g_LOFAElements.vectCount.value, 10)
-        g_batchSize = parseInt(g_LOFAElements.batchSize.value, 10)
-        g_workerCount = parseInt(g_LOFAElements.workerCount.value, 10)
-
-        // TODO: Input validation
-        // assert 0 <  g_vectCount
-        // assert 0 <  g_batchSize <= g_vectCount
-        // assert 0 <= g_workerCount
-
-        setTimeout(Initialize)
-    })
-
-function Initialize() {
-    // Dynamically build the array of 1x4 vectors
-    g_buffers = new Array(g_vectCount)
-    for (let i = 0; i < g_vectCount; i++) {
-        g_buffers[i] = Float64Array.from([
-            randBetween(0, 1000),
-            randBetween(0, 1000),
-            randBetween(0, 1000),
-            1,
-        ]).buffer
-    }
-
-    // If we're single-threaded (no workers) perform an in-place mutation
-    if (g_workerCount === 0) {
-        g_LOFAElements.state.innerHTML = `Single-threaded mutations...`
-        setTimeout(mutateInPlace())
-        return
-    }
-
-    // If we're using workers, set them up
-    g_workers = new Array(g_workerCount)
-    for (let i = 0; i < g_workerCount; i++) {
-        g_workers[i] = new Worker('worker.js')
-        g_workers[i].onmessage = workerOnMessage
-        g_workers[i].postMessage({ type: 'hello', msg: "making sure you're warm" })
-    }
-
-    // If we're not batching (the batch size is 1) try to optimize how we post
-    // TODO: We don't. This isn't optimized at all.
-    if (g_batchSize === 1) {
-        g_LOFAElements.state.innerHTML = `Transmitting individual buffers...`
-        g_LOFAElements.vectTx.innerHTML = '...'
-
-        setTimeout(transmitForEach)
-        return
-    }
-    // If we're sending the whole batch over in one go (batch size === vect
-    // count) try to optize that.
-    // TODO: It's not. It's not optimized. It's so slow...
-    if (g_batchSize == g_vectCount) {
-        g_LOFAElements.state.innerHTML = `Transmitting as one buffer...`
-        g_LOFAElements.vectTx.innerHTML = '...'
-
-        setTimeout(transmitAll)
-        return
-    }
-
-    // The general case;
-    g_LOFAElements.state.innerHTML = `Transmitting Batched buffers...`
-    g_startTime = performance.now()
-
-    setTimeout(transmitBatches, 0, 0)
-}
-
-function mutateInPlace() {
-    console.log(`starting with ${new Float64Array(g_buffers[0])}`)
-    g_startTime = performance.now()
-
-    g_buffers.forEach(e => {
-        let a = new Float64Array(e)
-        transform(a)
-    })
-    g_LOFAElements.vectTx.innerHTML = g_vectCount
-
-    setTimeout(markReplaced, 0, g_vectCount)
-    console.log(`ending with ${new Float64Array(g_buffers[0])}`)
-}
-
-function transmitForEach() {
-    g_startTime = performance.now()
-
-    g_buffers.forEach((e, i) => {
-        g_workers[i % g_workerCount].postMessage(
-            {
-                type: 'transform_one',
-                buffer: e,
-                index: i,
-            },
-            [e],
-        )
-    })
-    g_LOFAElements.vectTx.innerHTML = g_vectCount
-}
-
-function transmitAll() {
-    g_startTime = performance.now()
-
-    console.log('hi')
-    g_workers[0].postMessage(
-        {
-            type: 'transform',
-            buffers: g_buffers,
-            start: 0,
-            end: g_vectCount,
-        },
-        g_buffers,
-    )
-    console.log('bye')
-    g_LOFAElements.vectTx.innerHTML = g_vectCount
-}
-
-function transmitBatches(index) {
-    for (let j = 0; j < g_workerCount; j++) {
-        const start = index
-        const end = index + g_batchSize
-        const buffers = g_buffers.slice(start, end)
-        // Early out
-        if (buffers.length === 0) {
-            g_LOFAElements.vectTx.innerHTML = index
-            return
-        }
-        g_workers[j].postMessage(
-            {
-                type: 'transform',
-                buffers: buffers,
-                start: start,
-                end: end,
-            },
-            buffers,
-        )
-        index = end
-    }
-    g_LOFAElements.vectTx.innerHTML = index
-
-    if (index != g_vectCount) {
-        setTimeout(transmitBatches, 0, index)
-    }
-}
-
-function workerOnMessage(msg) {
-    switch (msg.data.type) {
-        case 'transformed':
-            for (var i = 0; i < msg.data.buffers.length; i++) {
-                g_buffers[i + msg.data.start] = msg.data.buffers[i]
-            }
-            markReplaced(msg.data.end - msg.data.start)
-            break
-        case 'transformed_one':
-            g_buffers[msg.data.index] = msg.data.buffer
-            markReplaced(1)
-            break
-        default:
-            console.error(`Received a message I don't know what to do with: ${JSON.stringify(msg.data)}`)
-            break
-    }
-}
-
-function markReplaced(count) {
-    g_replaced += count
-    g_LOFAElements.vectRx.innerHTML = g_replaced
-
-    if (g_replaced === g_vectCount) {
-        let duration = performance.now() - g_startTime
-
-        g_LOFAElements.runs.value += (
-            `number of Float64Arrays: ${g_vectCount} (${humanReadableBytes(g_vectCount * 4 * 64)}) ` +
-            `-- batch size: ${g_batchSize} (${humanReadableBytes(g_batchSize * 4 * 64)}) ` +
-            `-- worker count: ${g_workerCount}\n` +
-            `\t${duration.toFixed(2)}ms\n`
-        )
-        g_LOFAElements.state.innerHTML = "Finished"
-
-        g_reset()
-    }
 }
 
 function randBetween(min, max) {

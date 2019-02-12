@@ -39,17 +39,5 @@ self.onmessage = function (m) {
                 m.data.buffers,
             )
             break
-        case ('transform_one'):
-            let a = new Float64Array(m.data.buffer)
-            transform(a)
-            self.postMessage(
-                {
-                    type: 'transformed_one',
-                    index: m.data.index,
-                    buffer: m.data.buffer,
-                },
-                [m.data.buffer],
-            )
-            break
     }
 }
