@@ -9,54 +9,59 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css" />
 </head>
 
-<body>
-    <table>
-        <tbody>
-            <tr>
-                <td>
-                    Vector Count:
-                </td>
-                <td>
-                    <input type="text" id="vectCount" value="1000000" /><br />
-                </td>
-                <td>
-                    Vectors Sent:
-                </td>
-                <td id="vectTx">
-                    0
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    Batch Size:
-                </td>
-                <td>
-                    <input type="text" id="batchSize" value="1000" /><br />
-                </td>
-                <td>
-                    Vectors Received:
-                </td>
-                <td id="vectRx">
-                    0
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    Worker Count:
-                </td>
-                <td>
-                    <input type="text" id="workerCount" value="8" /><br />
-                </td>
-                <td id="state" style="width: 18.5rem;">
-                    Hit 'Run' when you're ready
-                </td>
-            </tr>
-        </tbody>
-    </table>
-    <div>
-        <button id="run" style="width: 4rem; margin-left: 3rem;">Run</button>
-    </div>
-    <textarea id="runs" rows="40" cols="80" style="margin: 1rem 1rem;"></textarea>
+<body style="padding: 1rem 1rem 0;">
+    <details id="listOfFloatArrays">
+        <summary>
+            List of Float64Array[4] -- Transfer | Process | Receive
+        </summary>
+        <table>
+            <tbody>
+                <tr>
+                    <td>
+                        Vector Count:
+                    </td>
+                    <td>
+                        <input type="text" id="vectCount" value="1000000" /><br />
+                    </td>
+                    <td>
+                        Vectors Sent:
+                    </td>
+                    <td id="vectTx">
+                        0
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        Batch Size:
+                    </td>
+                    <td>
+                        <input type="text" id="batchSize" value="1000" /><br />
+                    </td>
+                    <td>
+                        Vectors Received:
+                    </td>
+                    <td id="vectRx">
+                        0
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        Worker Count:
+                    </td>
+                    <td>
+                        <input type="text" id="workerCount" value="8" /><br />
+                    </td>
+                    <td id="state" style="width: 18.5rem;">
+                        Hit 'Run' when you're ready
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <div>
+            <button id="run" style="width: 4rem; margin-left: 3rem;">Run</button>
+        </div>
+    </details>
+    <textarea id="runs" rows="40" cols="80" style="margin: 1rem 0;"></textarea>
 
     <script type="application/javascript" src="./main.js"></script>
 </body>

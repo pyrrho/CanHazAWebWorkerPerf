@@ -1,9 +1,16 @@
 "use strict"
 
-const g_vectTxElement = document.getElementById("vectTx")
-const g_vectRxElement = document.getElementById("vectRx")
-const g_stateElement = document.getElementById("state")
-const g_runsElement = document.getElementById("runs")
+const g_LOFAElements = {
+    vectTx: document.querySelector("#vectTx"),
+    vectRx: document.querySelector("#vectRx"),
+    state: document.querySelector("#state"),
+    runs: document.querySelector("#runs"),
+    vectCount: document.getElementById('vectCount'),
+    batchSize: document.getElementById('batchSize'),
+    workerCount: document.getElementById('workerCount'),
+}
+
+let g_running = false
 
 let g_vectCount = 0
 let g_batchSize = 0
@@ -29,19 +36,41 @@ function g_reset() {
 
     g_startTime = 0
     g_replaced = 0
+
+    g_running = false
+}
+
+function humanReadableBytes(n) {
+    const size_suffixes = [
+        "B",
+        "KB",
+        "MB",
+        "GB",
+    ]
+    let s = 0
+    while (n > 1000.0) {
+        n /= 1024.
+        s += 1
+    }
+
+    return `${n.toFixed(2)}${size_suffixes[s]}`
+
 }
 
 
 document
     .getElementById('run')
     .addEventListener('click', () => {
-        g_stateElement.innerHTML = `Initializing...`
-        g_vectTxElement.innerHTML = 0
-        g_vectRxElement.innerHTML = 0
+        if (g_running) { return }
+        g_running = true
 
-        g_vectCount = parseInt(document.getElementById('vectCount').value, 10)
-        g_batchSize = parseInt(document.getElementById('batchSize').value, 10)
-        g_workerCount = parseInt(document.getElementById('workerCount').value, 10)
+        g_LOFAElements.state.innerHTML = `Initializing...`
+        g_LOFAElements.vectTx.innerHTML = 0
+        g_LOFAElements.vectRx.innerHTML = 0
+
+        g_vectCount = parseInt(g_LOFAElements.vectCount.value, 10)
+        g_batchSize = parseInt(g_LOFAElements.batchSize.value, 10)
+        g_workerCount = parseInt(g_LOFAElements.workerCount.value, 10)
 
         // TODO: Input validation
         // assert 0 <  g_vectCount
@@ -65,7 +94,7 @@ function Initialize() {
 
     // If we're single-threaded (no workers) perform an in-place mutation
     if (g_workerCount === 0) {
-        g_stateElement.innerHTML = `Single-threaded mutations...`
+        g_LOFAElements.state.innerHTML = `Single-threaded mutations...`
         setTimeout(mutateInPlace())
         return
     }
@@ -81,8 +110,8 @@ function Initialize() {
     // If we're not batching (the batch size is 1) try to optimize how we post
     // TODO: We don't. This isn't optimized at all.
     if (g_batchSize === 1) {
-        g_stateElement.innerHTML = `Transmitting individual buffers...`
-        g_vectTxElement.innerHTML = '...'
+        g_LOFAElements.state.innerHTML = `Transmitting individual buffers...`
+        g_LOFAElements.vectTx.innerHTML = '...'
 
         setTimeout(transmitForEach)
         return
@@ -91,15 +120,15 @@ function Initialize() {
     // count) try to optize that.
     // TODO: It's not. It's not optimized. It's so slow...
     if (g_batchSize == g_vectCount) {
-        g_stateElement.innerHTML = `Transmitting as one buffer...`
-        g_vectTxElement.innerHTML = '...'
+        g_LOFAElements.state.innerHTML = `Transmitting as one buffer...`
+        g_LOFAElements.vectTx.innerHTML = '...'
 
         setTimeout(transmitAll)
         return
     }
 
     // The general case;
-    g_stateElement.innerHTML = `Transmitting Batched buffers...`
+    g_LOFAElements.state.innerHTML = `Transmitting Batched buffers...`
     g_startTime = performance.now()
 
     setTimeout(transmitBatches, 0, 0)
@@ -113,7 +142,7 @@ function mutateInPlace() {
         let a = new Float64Array(e)
         transform(a)
     })
-    g_vectTxElement.innerHTML = g_vectCount
+    g_LOFAElements.vectTx.innerHTML = g_vectCount
 
     setTimeout(markReplaced, 0, g_vectCount)
     console.log(`ending with ${new Float64Array(g_buffers[0])}`)
@@ -132,7 +161,7 @@ function transmitForEach() {
             [e],
         )
     })
-    g_vectTxElement.innerHTML = g_vectCount
+    g_LOFAElements.vectTx.innerHTML = g_vectCount
 }
 
 function transmitAll() {
@@ -149,7 +178,7 @@ function transmitAll() {
         g_buffers,
     )
     console.log('bye')
-    g_vectTxElement.innerHTML = g_vectCount
+    g_LOFAElements.vectTx.innerHTML = g_vectCount
 }
 
 function transmitBatches(index) {
@@ -159,7 +188,7 @@ function transmitBatches(index) {
         const buffers = g_buffers.slice(start, end)
         // Early out
         if (buffers.length === 0) {
-            g_vectTxElement.innerHTML = index
+            g_LOFAElements.vectTx.innerHTML = index
             return
         }
         g_workers[j].postMessage(
@@ -173,7 +202,7 @@ function transmitBatches(index) {
         )
         index = end
     }
-    g_vectTxElement.innerHTML = index
+    g_LOFAElements.vectTx.innerHTML = index
 
     if (index != g_vectCount) {
         setTimeout(transmitBatches, 0, index)
@@ -200,16 +229,18 @@ function workerOnMessage(msg) {
 
 function markReplaced(count) {
     g_replaced += count
-    g_vectRxElement.innerHTML = g_replaced
+    g_LOFAElements.vectRx.innerHTML = g_replaced
 
     if (g_replaced === g_vectCount) {
         let duration = performance.now() - g_startTime
 
-        g_runsElement.value += (
-            `vector count: ${g_vectCount} -- batch size: ${g_batchSize} -- worker count: ${g_workerCount}\n` +
-            `\t${duration}ms\n`
+        g_LOFAElements.runs.value += (
+            `number of Float64Arrays: ${g_vectCount} (${humanReadableBytes(g_vectCount * 4 * 64)}) ` +
+            `-- batch size: ${g_batchSize} (${humanReadableBytes(g_batchSize * 4 * 64)}) ` +
+            `-- worker count: ${g_workerCount}\n` +
+            `\t${duration.toFixed(2)}ms\n`
         )
-        g_stateElement.innerHTML = "Finished"
+        g_LOFAElements.state.innerHTML = "Finished"
 
         g_reset()
     }
