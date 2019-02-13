@@ -18,7 +18,8 @@
                     Vector Count:
                 </td>
                 <td>
-                    <input type="text" id="vectCount" value="1000000" size="8" /><br />
+                    <input type="text" id="vectCount" value="1000000" size="8"
+                        style="font-family: monospace; font-size: 14px;" /><br />
                 </td>
 
                 <td>
@@ -36,7 +37,9 @@
                     Vectors per Batch:
                 </td>
                 <td>
-                    <input type="text" id="vectsPerBatch" value="1000" size="8" /><br />
+                    <input type="text" id="vectsPerBatch" value="1000" size="8"
+                        style="font-family: monospace; font-size: 14px;" />
+                    <br />
                 </td>
 
                 <td>
@@ -54,7 +57,9 @@
                     Worker Count:
                 </td>
                 <td>
-                    <input type="text" id="workerCount" value="8" size="8" /><br />
+                    <input type="text" id="workerCount" value="8" size="8"
+                        style="font-family: monospace; font-size: 14px;" />
+                    <br />
                 </td>
                 <td colspan="2" id="state" style="width: 18.5rem;">
                     Hit 'Run' when you're ready
@@ -79,7 +84,7 @@
                 List of List[4]
             </td>
             <td>
-                Send | Process | Receive
+                Via Webworkers
             </td>
             <td>
                 <button id="run_lol_send" style="width: 4rem; margin-left: 3rem;">Run</button>
@@ -101,7 +106,7 @@
                 List of Float64Array[4]
             </td>
             <td>
-                Send | Process | Receive
+                Via Webworkers
             </td>
             <td>
                 <button id="run_lofa_send" style="width: 4rem; margin-left: 3rem;">Run</button>
@@ -112,7 +117,7 @@
                 List of Float64Array[4*Batch]
             </td>
             <td>
-                Send | Process | Receive
+                Via Webworkers
             </td>
             <td>
                 <button id="run_lobatches_send" style="width: 4rem; margin-left: 3rem;">Run</button>
@@ -123,7 +128,7 @@
                 Float64Array[4*Count]
             </td>
             <td>
-                Send | Process | Receive
+                Via Webworkers
             </td>
             <td>
                 <button id="run_single_fa" style="width: 4rem; margin-left: 3rem;">Run</button>

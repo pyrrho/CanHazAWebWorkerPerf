@@ -25,18 +25,16 @@ self.onmessage = function (m) {
             )
             break
         case ('transform'):
-            m.data.buffers.forEach(e => {
-                let a = new Float64Array(e)
-                a.set(transform(a))
-            })
+            for (let i = 0, l = m.data.vects.length; i < l; i++) {
+                m.data.vects[i] = transform(m.data.vects[i])
+            }
             self.postMessage(
                 {
                     type: 'transformed',
                     start: m.data.start,
                     end: m.data.end,
-                    buffers: m.data.buffers,
+                    vects: m.data.vects,
                 },
-                m.data.buffers,
             )
             break
     }

@@ -40,10 +40,15 @@ let setStatusMessage = (msg) => {
     g_elements.state.innerHTML = msg
 }
 
-let resetState = () => {
-    setStatusMessage(`Initializing...`)
-    g_elements.tx.innerHTML = 0
-    g_elements.rx.innerHTML = 0
+let resetState = (val) => {
+    setStatusMessage("Initializing...")
+    if (val) {
+        g_elements.rx.innerHTML = val
+        g_elements.tx.innerHTML = val
+    } else {
+        g_elements.rx.innerHTML = '0'
+        g_elements.tx.innerHTML = '0'
+    }
 }
 
 let runStart = () => {
@@ -60,11 +65,11 @@ let runDuration = () => {
 }
 
 g_elements.vectCount.addEventListener('input', (e) => {
-    g_vectCount = e.target.value
+    g_vectCount = parseInt(e.target.value, 10)
     g_elements.vectCountBytes.innerHTML = humanReadableBytes(g_vectCount * 4 * 64)
 })
 g_elements.vectsPerBatch.addEventListener('input', (e) => {
-    g_vectsPerBatch = e.target.value
+    g_vectsPerBatch = parseInt(e.target.value, 10)
     g_elements.vectsPerBatchBytes.innerHTML = humanReadableBytes(g_vectsPerBatch * 4 * 64)
 })
 g_elements.buttons.clearOutput.addEventListener('click', () => {
@@ -74,25 +79,25 @@ g_elements.buttons.clearOutput.addEventListener('click', () => {
 // Primary runners
 g_elements.buttons.runListOfListsInPlace.addEventListener('click', () => {
     if (g_running) { return }
-    console.log("Starting List of Lists In-Place")
-    g_running = false
+    resetState('n/a')
+    setTimeout(listOfListsInPlace.start, 0, g_vectCount)
 })
 
 g_elements.buttons.runListOfListsSend.addEventListener('click', () => {
     if (g_running) { return }
-    console.log("Starting List of Lists with Web Workers")
-    g_running = false
+    resetState()
+    setTimeout(listOfListsSend.start, 0, g_vectCount, g_vectsPerBatch, g_workerCount)
 })
 
 g_elements.buttons.runListOfF64AInPlace.addEventListener('click', () => {
     if (g_running) { return }
-    setStatusMessage("Initializing...")
+    resetState('n/a')
     setTimeout(listOfF64AInPlace.start, 0, g_vectCount)
 })
 
 g_elements.buttons.runListOfF64ASend.addEventListener('click', () => {
     if (g_running) { return }
-    setStatusMessage("Initializing...")
+    resetState()
     setTimeout(listOfF64ASend.start, 0, g_vectCount, g_vectsPerBatch, g_workerCount)
 })
 
@@ -109,6 +114,187 @@ g_elements.buttons.runListOfSingleF64A.addEventListener('click', () => {
 })
 
 
+
+// List Of Lists In-Place
+// ----------------------
+let listOfListsInPlace = (() => {
+    let listOfListsInPlace = {}
+
+    let l_vects = []
+
+    listOfListsInPlace.start = (vectCount) => {
+        for (let i = 0; i < vectCount; i++) {
+            l_vects.push(Float64Array.from([
+                randBetween(0, 1000),
+                randBetween(0, 1000),
+                randBetween(0, 1000),
+                1,
+            ]).buffer)
+        }
+
+        runStart()
+        setStatusMessage(`Processing buffers...`)
+        g_elements.tx.innerHTML = 'n/a'
+        g_elements.rx.innerHTML = 'n/a'
+        setTimeout(listOfListsInPlace.processBuffers, 0)
+    }
+
+    listOfListsInPlace.processBuffers = () => {
+        for (let i = 0, l = l_vects.length; i < l; i++) {
+            // This constructor creates a new view, not a new array.
+            // I wOnDeR wHy It'S sO fAsT?
+            l_vects[i] = transform(l_vects[i])
+        }
+
+        runFinish()
+        setTimeout(listOfListsInPlace.finish)
+    }
+
+    listOfListsInPlace.finish = () => {
+        g_elements.output.value += (
+            `number of list[4] vectors: ${l_vects.length} ` +
+            '\n' +
+            `\t${runDuration().toFixed(2)}ms\n`
+        )
+
+        l_vects = []
+    }
+
+    return listOfListsInPlace
+})()
+
+// List Of Float64Array[4] Send
+// ----------------------------
+let listOfListsSend = (() => {
+    let listOfListsSend = {}
+
+    let l_vects = []
+    let l_vectsPerBatch = 0
+    let l_workers = []
+
+    let l_vectsSent = 0
+    let l_vectsReceived = 0
+
+    listOfListsSend.start = (vectCount, vectsPerBatch, workerCount) => {
+        // TODO: Input validation
+        // assert 0 <  vectCount
+        // assert 0 <  vectsPerBatch <= vectCount
+        // assert 0 <  workerCount
+
+        l_vectsPerBatch = vectsPerBatch
+
+        // Dynamically build the array of 1x4 vectors
+        for (let i = 0; i < vectCount; i++) {
+            l_vects.push([
+                randBetween(0, 1000),
+                randBetween(0, 1000),
+                randBetween(0, 1000),
+                1,
+            ])
+        }
+
+        // Setup workers
+        for (let i = 0; i < workerCount; i++) {
+            let w = new Worker('worker_lolists.js')
+            w.onmessage = workerOnMessage
+            w.postMessage({ type: 'ping' })
+
+            l_workers.push(w)
+        }
+        function workerOnMessage(msg) {
+            switch (msg.data.type) {
+                case 'pong':
+                    //noop
+                    break
+                case 'transformed':
+                    // msg.data: {
+                    //     type:    'transformed',
+                    //     vects: [ ArrayBuffer, ... ],
+                    //     start:   Number,
+                    //     end:     Number,
+                    // }
+                    let bufs = msg.data.vects
+                    for (let i = 0, l = bufs.length; i < l; i++) {
+                        l_vects[i + msg.data.start] = bufs[i]
+                    }
+                    listOfListsSend.markReceived(msg.data.end - msg.data.start)
+                    break
+                default:
+                    console.error(`Received a message I don't know what to do with: ${JSON.stringify(msg.data)}`)
+                    break
+            }
+        }
+
+        runStart()
+        setStatusMessage(`Transmitting batched vectors...`)
+        setTimeout(listOfListsSend.transmitBatches, 0, 0)
+    }
+
+    listOfListsSend.transmitBatches = (index) => {
+        for (let j = 0, l = l_workers.length; j < l; j++) {
+            if (index === l_vects.length) { return } // early out
+
+            const start = index
+            const end = index + l_vectsPerBatch
+            const vects = l_vects.slice(start, end)
+            const count = vects.length
+            // debugger
+
+            l_workers[j].postMessage(
+                {
+                    type: 'transform',
+                    vects: vects,
+                    start: start,
+                    end: start + count,
+                },
+            )
+
+            index += count
+            listOfListsSend.markSent(count)
+        }
+
+        if (index !== l_vects.length) {
+            setTimeout(listOfListsSend.transmitBatches, 0, index)
+        }
+    }
+
+    listOfListsSend.markSent = (count) => {
+        l_vectsSent += count
+        g_elements.tx.innerHTML = l_vectsSent
+    }
+
+    listOfListsSend.markReceived = (count) => {
+        l_vectsReceived += count
+        g_elements.rx.innerHTML = l_vectsReceived
+
+        if (l_vectsReceived === l_vects.length) {
+            listOfListsSend.finish()
+        }
+    }
+
+    listOfListsSend.finish = () => {
+        runFinish()
+
+        g_elements.output.value += (
+            `number of list[4] vectors: ${l_vects.length} ` +
+            `-- vectors per batch: ${l_vectsPerBatch} ` +
+            `-- worker count: ${l_workers.length}` +
+            `\n` +
+            `\t${runDuration().toFixed(2)}ms\n`
+        )
+
+        for (let i = 0, l = l_workers.length; i < l; i++) {
+            l_workers[i].terminate()
+        }
+
+        l_workers = []
+        l_vectsSent = 0
+        l_vectsReceived = 0
+        l_vects = []
+    }
+
+    return listOfListsSend
+})()
 
 // List Of Float64Array[4] In-Place
 // --------------------------------
@@ -191,7 +377,7 @@ let listOfF64ASend = (() => {
 
         // Setup workers
         for (let i = 0; i < workerCount; i++) {
-            let w = new Worker('worker.js')
+            let w = new Worker('worker_lof64a.js')
             w.onmessage = workerOnMessage
             w.postMessage({ type: 'ping' })
 
@@ -222,7 +408,7 @@ let listOfF64ASend = (() => {
         }
 
         runStart()
-        setStatusMessage(`Transmitting Batched buffers...`)
+        setStatusMessage(`Transmitting batched buffers...`)
         setTimeout(listOfF64ASend.transmitBatches, 0, 0)
     }
 
@@ -240,7 +426,7 @@ let listOfF64ASend = (() => {
                     type: 'transform',
                     buffers: buffers,
                     start: start,
-                    end: end,
+                    end: start + count,
                 },
                 buffers,
             )
