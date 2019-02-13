@@ -18,26 +18,34 @@
                     Vector Count:
                 </td>
                 <td>
-                    <input type="text" id="vectCount" value="1000000" /><br />
+                    <input type="text" id="vectCount" value="1000000" size="8" /><br />
+                </td>
+
+                <td>
+                    <span id="vectCountBytes">(pending...)</span>
                 </td>
                 <td>
                     Vectors Sent:
                 </td>
-                <td id="vectTx">
+                <td id="stateTx">
                     0
                 </td>
             </tr>
             <tr>
                 <td>
-                    Batch Size:
+                    Vectors per Batch:
                 </td>
                 <td>
-                    <input type="text" id="batchSize" value="1000" /><br />
+                    <input type="text" id="vectsPerBatch" value="1000" size="8" /><br />
+                </td>
+
+                <td>
+                    <span id="vectsPerBatchBytes">(pending...)</span>
                 </td>
                 <td>
                     Vectors Received:
                 </td>
-                <td id="vectRx">
+                <td id="stateRx">
                     0
                 </td>
             </tr>
@@ -46,9 +54,9 @@
                     Worker Count:
                 </td>
                 <td>
-                    <input type="text" id="workerCount" value="8" /><br />
+                    <input type="text" id="workerCount" value="8" size="8" /><br />
                 </td>
-                <td id="state" style="width: 18.5rem;">
+                <td colspan="2" id="state" style="width: 18.5rem;">
                     Hit 'Run' when you're ready
                 </td>
             </tr>
@@ -126,7 +134,8 @@
     </div>
     </details>
 
-    <textarea id="output" rows="40" cols="80" style="margin: 1rem 0;"></textarea>
+    <button id="clearOutput" style="width: 8rem; margin-top: 1rem;">Clear Output</button>
+    <textarea id="output" rows="32" cols="80" style="margin: 1rem 0;"></textarea>
 
     <script type="application/javascript" src="./main.js"></script>
 </body>
