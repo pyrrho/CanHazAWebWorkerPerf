@@ -86,8 +86,8 @@ g_elements.buttons.runListOfListsSend.addEventListener('click', () => {
 
 g_elements.buttons.runListOfF64AInPlace.addEventListener('click', () => {
     if (g_running) { return }
-    console.log("Starting List of FloatArray[4] In-Place")
-    g_running = false
+    setStatusMessage("Initializing...")
+    setTimeout(listOfF64AInPlace.start, 0, g_vectCount)
 })
 
 g_elements.buttons.runListOfF64ASend.addEventListener('click', () => {
@@ -109,6 +109,55 @@ g_elements.buttons.runListOfSingleF64A.addEventListener('click', () => {
 })
 
 
+
+// List Of Float64Array[4] In-Place
+// --------------------------------
+let listOfF64AInPlace = (() => {
+    let listOfF64AInPlace = {}
+
+    let l_buffers = []
+
+    listOfF64AInPlace.start = (vectCount) => {
+        for (let i = 0; i < vectCount; i++) {
+            l_buffers.push(Float64Array.from([
+                randBetween(0, 1000),
+                randBetween(0, 1000),
+                randBetween(0, 1000),
+                1,
+            ]).buffer)
+        }
+
+        runStart()
+        setStatusMessage(`Processing buffers...`)
+        g_elements.tx.innerHTML = 'n/a'
+        g_elements.rx.innerHTML = 'n/a'
+        setTimeout(listOfF64AInPlace.processBuffers, 0)
+    }
+
+    listOfF64AInPlace.processBuffers = () => {
+        for (let i = 0, l = l_buffers.length; i < l; i++) {
+            // This constructor creates a new view, not a new array.
+            // I wOnDeR wHy It'S sO fAsT?
+            let a = new Float64Array(l_buffers[i])
+            transform(a)
+        }
+
+        runFinish()
+        setTimeout(listOfF64AInPlace.finish)
+    }
+
+    listOfF64AInPlace.finish = () => {
+        g_elements.output.value += (
+            `number of Float64Arrays buffers: ${l_buffers.length} ` +
+            '\n' +
+            `\t${runDuration().toFixed(2)}ms\n`
+        )
+
+        l_buffers = []
+    }
+
+    return listOfF64AInPlace
+})()
 
 // List Of Float64Array[4] Send
 // ----------------------------
@@ -225,7 +274,8 @@ let listOfF64ASend = (() => {
         g_elements.output.value += (
             `number of Float64Arrays buffers: ${l_buffers.length} ` +
             `-- buffers per batch: ${l_buffersPerBatch} ` +
-            `-- worker count: ${l_workers.length}\n` +
+            `-- worker count: ${l_workers.length}` +
+            `\n` +
             `\t${runDuration().toFixed(2)}ms\n`
         )
 
