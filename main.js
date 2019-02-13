@@ -18,7 +18,6 @@ const g_elements = {
         runListOfF64AInPlace: document.querySelector('#run_lofa_inplace'),
         runListOfF64ASend: document.querySelector('#run_lofa_send'),
         runListOfBatchesSend: document.querySelector('#run_lobatches_send'),
-        runListOfSingleF64A: document.querySelector('#run_single_fa'),
     },
 }
 
@@ -103,14 +102,8 @@ g_elements.buttons.runListOfF64ASend.addEventListener('click', () => {
 
 g_elements.buttons.runListOfBatchesSend.addEventListener('click', () => {
     if (g_running) { return }
-    console.log("Starting List of Batched FloatArray[4*vectsPerBatch]")
-    g_running = false
-})
-
-g_elements.buttons.runListOfSingleF64A.addEventListener('click', () => {
-    if (g_running) { return }
-    console.log("Starting Single FloatArray[4*VectorCount]")
-    g_running = false
+    resetState()
+    setTimeout(listOfBatchesSend.start, 0, g_vectCount, g_vectsPerBatch, g_workerCount)
 })
 
 
@@ -238,7 +231,6 @@ let listOfListsSend = (() => {
             const end = index + l_vectsPerBatch
             const vects = l_vects.slice(start, end)
             const count = vects.length
-            // debugger
 
             l_workers[j].postMessage(
                 {
@@ -334,7 +326,7 @@ let listOfF64AInPlace = (() => {
 
     listOfF64AInPlace.finish = () => {
         g_elements.output.value += (
-            `number of Float64Arrays buffers: ${l_buffers.length} ` +
+            `number of Float64Arrays[4]s: ${l_buffers.length} ` +
             '\n' +
             `\t${runDuration().toFixed(2)}ms\n`
         )
@@ -458,7 +450,7 @@ let listOfF64ASend = (() => {
         runFinish()
 
         g_elements.output.value += (
-            `number of Float64Arrays buffers: ${l_buffers.length} ` +
+            `number of Float64Array[4] buffers: ${l_buffers.length} ` +
             `-- buffers per batch: ${l_buffersPerBatch} ` +
             `-- worker count: ${l_workers.length}` +
             `\n` +
@@ -478,6 +470,138 @@ let listOfF64ASend = (() => {
     return listOfF64ASend
 })()
 
+// List Of Float64Array[4*Vectors per Batch] Send
+// ----------------------------------------------
+let listOfBatchesSend = (() => {
+    let listOfBatchesSend = {}
+
+    let l_vectCount = 0
+    let l_buffers = []
+    let l_vectsPerBatch = 0
+    let l_workers = []
+
+    let l_vectsSent = 0
+    let l_vectsReceived = 0
+
+    listOfBatchesSend.start = (vectCount, vectsPerBatch, workerCount) => {
+        l_vectCount = vectCount
+        l_vectsPerBatch = vectsPerBatch
+
+        let bufferCount = vectCount / vectsPerBatch
+        for (let i = 0; i < bufferCount; i++) {
+            // The last buffer may be shorter than the rest;
+            let vectsCreated = (i * vectsPerBatch)
+            let vectsLeft = vectCount - vectsCreated
+            let arrayLen = Math.min(vectsPerBatch, vectsLeft)
+
+            let fbuf = new Float64Array(4 * arrayLen)
+            for (let j = 0, l = fbuf.length; j < l; j += 4) {
+                fbuf[j + 0] = randBetween(0, 1000)
+                fbuf[j + 1] = randBetween(0, 1000)
+                fbuf[j + 2] = randBetween(0, 1000)
+                fbuf[j + 3] = 1
+            }
+
+            l_buffers.push(fbuf.buffer)
+        }
+
+        // Setup workers
+        for (let i = 0; i < workerCount; i++) {
+            let w = new Worker('worker_lobatches.js')
+            w.onmessage = workerOnMessage
+            w.postMessage({ type: 'ping' })
+
+            l_workers.push(w)
+        }
+        function workerOnMessage(msg) {
+            switch (msg.data.type) {
+                case 'pong':
+                    //noop
+                    break
+                case 'transformed':
+                    // msg.data: {
+                    //     type:   'transformed',
+                    //     buffer: ArrayBuffer,
+                    //     index:  Number,
+                    //     count:  Number,
+                    // }
+                    l_buffers[msg.data.index] = msg.data.buffer
+                    listOfBatchesSend.markReceived(msg.data.count)
+                    break
+                default:
+                    console.error(`Received a message I don't know what to do with: ${JSON.stringify(msg.data)}`)
+                    break
+            }
+        }
+
+        runStart()
+        setStatusMessage(`Transmitting batched buffers...`)
+        setTimeout(listOfBatchesSend.transmitBatches, 0, 0)
+    }
+
+    listOfBatchesSend.transmitBatches = (index) => {
+        let bufferCount = l_buffers.length;
+
+        for (let j = 0, l = l_workers.length; j < l; j++) {
+            if (index === bufferCount) { return } // early out
+            let vectsInBuffer = (new Float64Array(l_buffers[index])).length / 4
+
+            l_workers[j].postMessage(
+                {
+                    type: 'transform',
+                    buffer: l_buffers[index],
+                    index: index,
+                    count: vectsInBuffer,
+                },
+                [l_buffers[index]],
+            )
+
+            index += 1
+            listOfBatchesSend.markSent(vectsInBuffer)
+        }
+
+        if (index !== bufferCount) {
+            setTimeout(listOfBatchesSend.transmitBatches, 0, index)
+        }
+    }
+
+    listOfBatchesSend.markSent = (count) => {
+        l_vectsSent += count
+        g_elements.tx.innerHTML = l_vectsSent
+    }
+
+    listOfBatchesSend.markReceived = (count) => {
+        l_vectsReceived += count
+        g_elements.rx.innerHTML = l_vectsReceived
+
+        if (l_vectsReceived === l_vectCount) {
+            listOfBatchesSend.finish()
+        }
+    }
+
+    listOfBatchesSend.finish = () => {
+        runFinish()
+
+        g_elements.output.value += (
+            `number of Float64Arrays[4 * Vectors per Buffer] buffers: ${l_buffers.length} ` +
+            `-- vectors per buffer: ${l_vectsPerBatch} ` +
+            `-- worker count: ${l_workers.length}` +
+            `\n` +
+            `\t${runDuration().toFixed(2)}ms\n`
+        )
+
+        for (let i = 0, l = l_workers.length; i < l; i++) {
+            l_workers[i].terminate()
+        }
+
+        l_workers = []
+        l_vectsSent = 0
+        l_vectsReceived = 0
+        l_buffers = []
+    }
+
+    return listOfBatchesSend
+})()
 
 
 
