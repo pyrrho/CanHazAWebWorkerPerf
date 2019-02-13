@@ -36,12 +36,28 @@ let g_endTime = 0
 g_elements.vectCountBytes.innerHTML = humanReadableBytes(g_vectCount * 4 * 64)
 g_elements.vectsPerBatchBytes.innerHTML = humanReadableBytes(g_vectsPerBatch * 4 * 64)
 
+let setStatusMessage = (msg) => {
+    g_elements.state.innerHTML = msg
+}
+
 let resetState = () => {
-    g_elements.state.innerHTML = `Initializing...`
+    setStatusMessage(`Initializing...`)
     g_elements.tx.innerHTML = 0
     g_elements.rx.innerHTML = 0
 }
 
+let runStart = () => {
+    g_running = true
+    g_startTime = performance.now()
+}
+let runFinish = () => {
+    g_endTime = performance.now()
+    setStatusMessage('Finished')
+    g_running = false
+}
+let runDuration = () => {
+    return g_endTime - g_startTime
+}
 
 g_elements.vectCount.addEventListener('input', (e) => {
     g_vectCount = e.target.value
@@ -58,48 +74,37 @@ g_elements.buttons.clearOutput.addEventListener('click', () => {
 // Primary runners
 g_elements.buttons.runListOfListsInPlace.addEventListener('click', () => {
     if (g_running) { return }
-    g_running = true
     console.log("Starting List of Lists In-Place")
-    resetState()
     g_running = false
 })
 
 g_elements.buttons.runListOfListsSend.addEventListener('click', () => {
     if (g_running) { return }
-    g_running = true
     console.log("Starting List of Lists with Web Workers")
-    resetState()
     g_running = false
 })
 
 g_elements.buttons.runListOfF64AInPlace.addEventListener('click', () => {
     if (g_running) { return }
-    g_running = true
     console.log("Starting List of FloatArray[4] In-Place")
-    resetState()
     g_running = false
 })
 
 g_elements.buttons.runListOfF64ASend.addEventListener('click', () => {
     if (g_running) { return }
-    g_running = true
-    resetState()
+    setStatusMessage("Initializing...")
     setTimeout(listOfF64ASend.start, 0, g_vectCount, g_vectsPerBatch, g_workerCount)
 })
 
 g_elements.buttons.runListOfBatchesSend.addEventListener('click', () => {
     if (g_running) { return }
-    g_running = true
     console.log("Starting List of Batched FloatArray[4*vectsPerBatch]")
-    resetState()
     g_running = false
 })
 
 g_elements.buttons.runListOfSingleF64A.addEventListener('click', () => {
     if (g_running) { return }
-    g_running = true
     console.log("Starting Single FloatArray[4*VectorCount]")
-    resetState()
     g_running = false
 })
 
@@ -167,10 +172,8 @@ let listOfF64ASend = (() => {
             }
         }
 
-        // The general case;
-        g_elements.state.innerHTML = `Transmitting Batched buffers...`
-        g_startTime = performance.now()
-
+        runStart()
+        setStatusMessage(`Transmitting Batched buffers...`)
         setTimeout(listOfF64ASend.transmitBatches, 0, 0)
     }
 
@@ -217,15 +220,13 @@ let listOfF64ASend = (() => {
     }
 
     listOfF64ASend.finish = () => {
-        let duration = performance.now() - g_startTime
-        g_running = false
+        runFinish()
 
-        g_elements.state.innerHTML = 'Finished'
         g_elements.output.value += (
             `number of Float64Arrays buffers: ${l_buffers.length} ` +
             `-- buffers per batch: ${l_buffersPerBatch} ` +
             `-- worker count: ${l_workers.length}\n` +
-            `\t${duration.toFixed(2)}ms\n`
+            `\t${runDuration().toFixed(2)}ms\n`
         )
 
         for (let i = 0, l = l_workers.length; i < l; i++) {
