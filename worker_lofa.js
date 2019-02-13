@@ -12,7 +12,7 @@ function transform(v) {
     ret[2] = (v[0] * TRANSFORM[2][0]) + (v[1] * TRANSFORM[2][1]) + (v[2] * TRANSFORM[2][2]) + (v[3] * TRANSFORM[2][3])
     ret[3] = (v[0] * TRANSFORM[3][0]) + (v[1] * TRANSFORM[3][1]) + (v[2] * TRANSFORM[3][2]) + (v[3] * TRANSFORM[3][3])
 
-    v.set(ret)
+    return ret
 }
 
 self.onmessage = function (m) {
@@ -27,7 +27,7 @@ self.onmessage = function (m) {
         case ('transform'):
             m.data.buffers.forEach(e => {
                 let a = new Float64Array(e)
-                transform(a)
+                a.set(transform(a))
             })
             self.postMessage(
                 {
